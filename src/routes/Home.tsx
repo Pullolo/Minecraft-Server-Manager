@@ -14,7 +14,12 @@ import Loader from "../components/Loader";
 import { ServerCard } from "../components/ServerCard";
 import NoDataSvg from "../components/svgs/NoDataSvg";
 import { useAppData } from "../hooks/appdata";
-import { usePingServer, useServers, useStorage } from "../hooks/servers";
+import {
+  Server,
+  usePingServer,
+  useServers,
+  useStorage,
+} from "../hooks/servers";
 
 export default function Home() {
   const navigate = useNavigate();
@@ -36,11 +41,12 @@ export default function Home() {
   // Memoize filtered and sorted servers
   const filteredServers = useMemo(() => {
     if (!servers) return [];
-    return [...servers]
-      .map((server, index) => ({
+    return (
+      [...servers].map((server, index) => ({
         ...server,
         storage: storage ? storage[index] : 0,
-      }))
+      })) as (Server & { storage: string })[]
+    )
       .sort((a, b) => b.last_played.getTime() - a.last_played.getTime())
       .filter(
         (server) =>
