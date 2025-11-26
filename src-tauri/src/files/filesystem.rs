@@ -54,10 +54,12 @@ pub fn get_servers(state: tauri::State<AppState>) -> Vec<Server> {
     for dir in contents {
         let path = dir.unwrap().path();
 
+        //todo check if path contains a .jar or forge/fabric metadata file
+
         let server = Server {
             name: path.file_name().unwrap().to_string_lossy().to_string(),
-            engine: String::new(), //todo
-            version: String::new(), //todo
+            engine: String::from("Vanilla"), //todo
+            version: String::from("1.21.10"), //todo
             location: path.to_string_lossy().to_string(),
             last_played: chrono::DateTime::<chrono::Utc>::from(
                 std::fs::metadata(&path).unwrap().modified().unwrap()
