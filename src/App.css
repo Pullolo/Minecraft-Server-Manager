@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: rgb(16, 185, 129); /* emerald-500 - green theme */
+  --color-primary-hover: rgb(5, 150, 105); /* emerald-600 */
+  --color-primary-subtle: rgb(16, 185, 129 / 0.1); /* emerald-500/10 */
+  --color-primary-border: rgb(16, 185, 129 / 0.2); /* emerald-500/20 */
+
+  /* Future theme support - can be swapped by changing these values */
+  /* Blue theme: rgb(59, 130, 246) */
+  /* Red theme: rgb(239, 68, 68) */
+}
+
 button {
   cursor: pointer;
 }

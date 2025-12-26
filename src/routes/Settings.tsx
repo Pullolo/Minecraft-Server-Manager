@@ -83,11 +83,11 @@ export default function Settings() {
   };
 
   return (
-    <main className="min-h-screen w-full bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6">
+    <main className="min-h-screen w-full bg-slate-950 text-white p-6">
       <div className="flex flex-col items-start w-full gap-8 min-h-[calc(100vh-3rem)]">
         <div className="flex justify-between items-center w-full">
           <div className="flex flex-col">
-            <h1 className="text-5xl font-bold mb-2 bg-linear-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent p-2">
+            <h1 className="text-5xl font-bold mb-2 text-primary p-2">
               Settings
             </h1>
             <p className="text-slate-400">
@@ -132,10 +132,10 @@ export default function Settings() {
             style={{
               minWidth: `calc(${appData?.working_dir.length}ch + 13rem)`,
             }}
-            className="bg-linear-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all"
+            className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all"
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-linear-to-br from-emerald-500/20 to-cyan-500/20 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-primary-subtle flex items-center justify-center">
                 <HardDrive size={24} className="text-emerald-400" />
               </div>
               <div>
@@ -199,10 +199,10 @@ export default function Settings() {
             style={{
               minWidth: `calc(${appData?.working_dir.length}ch + 13rem)`,
             }}
-            className="bg-linear-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all"
+            className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all"
           >
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-xl bg-linear-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
                 <Wifi size={24} className="text-blue-400" />
               </div>
               <div>
@@ -262,7 +262,7 @@ export default function Settings() {
           {saving ? (
             <button
               style={{ cursor: "not-allowed" }}
-              className="flex-1 px-6 py-4 rounded-xl bg-linear-to-r from-emerald-500 to-cyan-500 text-white font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
+              className="flex-1 px-6 py-4 rounded-xl bg-primary text-white font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25"
             >
               <Loader size={20} />
               Saving...
@@ -270,7 +270,7 @@ export default function Settings() {
           ) : canSave ? (
             <button
               onClick={handleSave}
-              className="flex-1 px-6 py-4 rounded-xl bg-linear-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[102%]"
+              className="flex-1 px-6 py-4 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[102%]"
             >
               <Save size={20} />
               Save Changes
@@ -278,7 +278,7 @@ export default function Settings() {
           ) : (
             <button
               style={{ cursor: "not-allowed" }}
-              className="flex-1 px-6 py-4 rounded-xl bg-linear-to-r from-red-500 to-orange-500 text-white font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
+              className="flex-1 px-6 py-4 rounded-xl bg-red-500 text-white font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-500/25"
             >
               <X size={20} />
               Can't Save

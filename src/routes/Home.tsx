@@ -105,14 +105,12 @@ export default function Home() {
   };
 
   return (
-    <main className="flex justify-start flex-col gap-8 min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-6">
+    <main className="flex justify-start flex-col gap-8 min-h-screen bg-slate-950 text-white p-6">
       {/* Top Section */}
       <div className="flex w-full justify-between items-center">
         <div className="flex flex-col justify-center items-start">
           <div className="flex justify-center items-center gap-2">
-            <span className="text-6xl font-bold mb-2 bg-linear-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
-              MC
-            </span>
+            <span className="text-6xl font-bold mb-2 text-primary">MC</span>
             <span className="flex flex-col">
               <span className="text-3xl font-medium ">Server Creator</span>
               <span className="text-sm text-white/50 font-light">
@@ -133,7 +131,7 @@ export default function Home() {
           </button>
           <button
             onClick={handleCreate}
-            className="h-fit min-h-12 px-6 py-3 rounded-xl bg-linear-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[102%]"
+            className="h-fit min-h-12 px-6 py-3 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[102%]"
           >
             <Plus size={20} />
             Create Server
@@ -143,7 +141,7 @@ export default function Home() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="bg-linear-to-br from-emerald-500/10 to-emerald-500/5 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-6">
+        <div className="bg-emerald-500/5 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-1">Total Servers</p>
@@ -162,7 +160,7 @@ export default function Home() {
         </div>
 
         {isPinging || isRePinging ? (
-          <div className="bg-linear-to-br from-gray-500/10 to-gray-500/5 backdrop-blur-xl border border-gray-500/20 rounded-2xl p-6">
+          <div className="bg-gray-500/5 backdrop-blur-xl border border-gray-500/20 rounded-2xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm mb-1">Server Accessible</p>
@@ -178,7 +176,7 @@ export default function Home() {
             onClick={() => {
               rePing();
             }}
-            className="cursor-pointer bg-linear-to-br from-green-500/10 to-green-500/5 backdrop-blur-xl border border-green-500/20 rounded-2xl p-6 hover:from-green-600/10 hover:to-green-600/6"
+            className="cursor-pointer bg-green-500/5 backdrop-blur-xl border border-green-500/20 rounded-2xl p-6 hover:bg-green-600/8"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -197,7 +195,7 @@ export default function Home() {
             onClick={() => {
               rePing();
             }}
-            className="bg-linear-to-br from-red-500/10 to-red-500/5 hover:to-red-600/5 hover:from-red-600/10 backdrop-blur-xl border border-red-500/20 hover:border-red-600/20 rounded-2xl p-6 cursor-pointer"
+            className="bg-red-500/5 hover:bg-red-600/8 backdrop-blur-xl border border-red-500/20 hover:border-red-600/20 rounded-2xl p-6 cursor-pointer"
           >
             <div className="flex items-center justify-between">
               <div>
@@ -211,7 +209,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className="bg-linear-to-br from-blue-500/10 to-blue-500/5 backdrop-blur-xl border border-blue-500/20 rounded-2xl p-6">
+        <div className="bg-blue-500/5 backdrop-blur-xl border border-blue-500/20 rounded-2xl p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-400 text-sm mb-1">Total Storage</p>
@@ -276,7 +274,7 @@ export default function Home() {
               <p className="text-slate-400 text-3xl">No Servers Created Yet</p>
               <button
                 onClick={handleCreate}
-                className="h-fit min-h-12 px-6 py-3 rounded-xl bg-linear-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white font-semibold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[102%]"
+                className="h-fit min-h-12 px-6 py-3 rounded-xl bg-primary hover:bg-primary-hover text-white font-semibold transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 hover:scale-[102%]"
               >
                 <Plus size={20} />
                 Create One
@@ -293,7 +291,7 @@ export default function Home() {
         ))}
       <button
         onClick={scrollToTop}
-        className={`fixed bottom-8 right-8 w-12 h-12 rounded-full bg-linear-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 flex items-center justify-center transition-all duration-300 ${
+        className={`fixed bottom-8 right-8 w-12 h-12 rounded-full bg-primary hover:bg-primary-hover text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 flex items-center justify-center transition-all duration-300 ${
           showScrollTop
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-16 pointer-events-none"

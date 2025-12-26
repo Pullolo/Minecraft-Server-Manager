@@ -25,13 +25,13 @@ export const ServerCard = React.memo(
     };
 
     return (
-      <div className="group relative bg-linear-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-5 hover:border-emerald-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/10">
-        <div className="absolute inset-0 bg-linear-to-br from-emerald-500/5 to-cyan-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      <div className="group relative bg-slate-800/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-5 hover:border-emerald-500/50 transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/10">
+        <div className="absolute inset-0 bg-primary-subtle rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         <div className="relative">
           {/* Header */}
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-12 h-12 rounded-xl bg-linear-to-br from-slate-700/50 to-slate-800/50 flex items-center justify-center text-2xl shrink-0 border border-slate-600/30">
+            <div className="w-12 h-12 rounded-xl bg-slate-700/50 flex items-center justify-center text-2xl shrink-0 border border-slate-600/30">
               🎮
             </div>
             <div className="flex-1 min-w-0">
@@ -92,7 +92,7 @@ export const ServerCard = React.memo(
           <div className="flex gap-2">
             <button
               onClick={handleManage}
-              className="flex-1 px-3 py-2 rounded-lg bg-linear-to-r from-emerald-500/90 to-cyan-500/90 hover:from-emerald-500 hover:to-cyan-500 text-white text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
+              className="flex-1 px-3 py-2 rounded-lg bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
             >
               <Settings size={14} />
               Manage
