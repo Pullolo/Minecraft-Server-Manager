@@ -1,5 +1,6 @@
 use crate::files::{filesystem::{Server, dir_exists, get_server_storage_size, get_servers}, mem::{AppData, AppState, load_data, save_data}};
 use tauri::State;
+use tauri::command;
 
 #[tauri::command]
 pub fn get_app_data(app: tauri::AppHandle, state: tauri::State<AppState>) -> Result<AppData, String> {
@@ -47,4 +48,87 @@ pub async fn fetch_server_storage_sizes(
     .map_err(|e| e.to_string())?;
     
     Ok(result)
+}
+
+#[command]
+pub fn open_directory(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    
+    Ok(())
+}
+
+#[command]
+pub fn open_terminal(path: String) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        // Open Windows Terminal if available, fallback to cmd
+        let terminal_result = std::process::Command::new("wt")
+            .args(["-d", &path])
+            .spawn();
+            
+        if terminal_result.is_err() {
+            // Fallback to cmd.exe
+            std::process::Command::new("cmd")
+                .args(["/c", "start", "cmd.exe"])
+                .current_dir(&path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        // Open Terminal.app
+        std::process::Command::new("open")
+            .args(["-a", "Terminal", &path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        // Try common terminal emulators
+        let terminals = ["gnome-terminal", "konsole", "xfce4-terminal", "xterm"];
+        let mut success = false;
+        
+        for terminal in &terminals {
+            let result = std::process::Command::new(terminal)
+                .arg("--working-directory")
+                .arg(&path)
+                .spawn();
+                
+            if result.is_ok() {
+                success = true;
+                break;
+            }
+        }
+        
+        if !success {
+            return Err("No terminal emulator found".to_string());
+        }
+    }
+    
+    Ok(())
 }

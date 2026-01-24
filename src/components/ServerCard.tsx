@@ -4,11 +4,13 @@ import {
   HardDrive,
   Package,
   Settings,
+  Terminal,
   Trash2,
   User2,
 } from "lucide-react";
 import { Server } from "../hooks/servers";
 import React from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 export const ServerCard = React.memo(
   ({ server }: { server: Server & { storage: string } }) => {
@@ -16,8 +18,12 @@ export const ServerCard = React.memo(
       console.log("Managing server:", server.name);
     };
 
-    const handleOpenFolder = () => {
-      console.log("Opening folder:", server.location);
+    const handleOpenFolder = async () => {
+      await invoke("open_directory", { path: server.location });
+    };
+
+    const handleCommandLineOpen = async () => {
+      await invoke("open_terminal", { path: server.location });
     };
 
     const handleDelete = () => {
@@ -105,6 +111,13 @@ export const ServerCard = React.memo(
               <FolderOpen size={16} />
             </button>
             <button
+              onClick={handleCommandLineOpen}
+              className="px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600/50 hover:border-slate-500 text-slate-300 hover:text-white transition-all"
+              title="Open Command Line"
+            >
+              <Terminal size={16} />
+            </button>
+            <button
               onClick={handleDelete}
               className="px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-red-500/20 border border-slate-600/50 hover:border-red-500/50 hover:text-red-400 text-slate-300 transition-all"
               title="Delete Server"
@@ -115,5 +128,5 @@ export const ServerCard = React.memo(
         </div>
       </div>
     );
-  }
+  },
 );
