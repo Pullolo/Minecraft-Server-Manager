@@ -15,6 +15,37 @@ button {
   cursor: pointer;
 }
 
+.console-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.console-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.console-scroll::-webkit-scrollbar-thumb {
+  background: rgb(51 65 85 / 0.8); /* slate-700/80 */
+  border-radius: 9999px;
+}
+
+.console-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(16 185 129 / 0.5); /* emerald-500/50 */
+}
+
+.console-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Tab strips and other horizontal-only scroll areas — hide the scrollbar visually */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+
 @keyframes slideIn {
   from {
     opacity: 0;

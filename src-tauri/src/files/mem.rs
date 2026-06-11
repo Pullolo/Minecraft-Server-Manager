@@ -19,12 +19,18 @@ pub fn get_default_data() -> AppData {
 
 pub struct AppState {
     pub data: Mutex<Option<AppData>>,
+    pub server_stdin: Mutex<Option<std::process::ChildStdin>>,
+    pub server_running: Mutex<bool>,
+    pub server_location: Mutex<Option<String>>,
 }
 
 impl AppState {
     pub fn new() -> Self {
         Self {
             data: Mutex::new(None),
+            server_stdin: Mutex::new(None),
+            server_running: Mutex::new(false),
+            server_location: Mutex::new(None),
         }
     }
 }

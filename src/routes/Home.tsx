@@ -1,5 +1,6 @@
 import {
   ArrowUp,
+  ChevronRight,
   Cpu,
   HardDrive,
   Plus,
@@ -10,7 +11,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import Loader from "../components/Loader";
+import CreateServer from "../components/CreateServer";
 import { ServerCard } from "../components/ServerCard";
 import NoDataSvg from "../components/svgs/NoDataSvg";
 import { useAppData } from "../hooks/appdata";
@@ -36,7 +40,25 @@ export default function Home() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [displayCount, setDisplayCount] = useState(10);
+  const [runningLocation, setRunningLocation] = useState<string | null>(null);
   const observerRef = useRef<HTMLDivElement>(null);
+
+  // Sync running server state with backend
+  useEffect(() => {
+    invoke<string | null>("get_running_server_location").then(setRunningLocation);
+
+    const unlistenStarted = listen<string>("server-started", (e) =>
+      setRunningLocation(e.payload),
+    );
+    const unlistenStopped = listen("server-stopped", () =>
+      setRunningLocation(null),
+    );
+
+    return () => {
+      unlistenStarted.then((fn) => fn());
+      unlistenStopped.then((fn) => fn());
+    };
+  }, []);
 
   // Memoize filtered and sorted servers
   const filteredServers = useMemo(() => {
@@ -67,7 +89,15 @@ export default function Home() {
     return storage?.reduce((sum, s) => sum + parseFloat(s), 0).toFixed(2);
   }, [storage]);
 
-  const handleCreate = () => {};
+  const runningServer = useMemo(() => {
+    if (!runningLocation || !servers) return null;
+    const idx = servers.findIndex((s) => s.location === runningLocation);
+    if (idx === -1) return null;
+    return { ...servers[idx], storage: storage?.[idx] ?? "..." };
+  }, [runningLocation, servers, storage]);
+
+  const [showCreateServer, setShowCreateServer] = useState(false);
+  const handleCreate = () => setShowCreateServer(true);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -138,6 +168,38 @@ export default function Home() {
           </button>
         </div>
       </div>
+
+      {/* Running server banner */}
+      {runningServer && (
+        <button
+          onClick={() =>
+            navigate(
+              `/manage/${encodeURIComponent(runningServer.name)}`,
+              { state: { server: runningServer } },
+            )
+          }
+          className="w-full flex items-center justify-between px-5 py-3.5 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/30 hover:border-emerald-500/50 rounded-2xl transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="relative flex items-center justify-center">
+              <span className="absolute w-3 h-3 rounded-full bg-emerald-400 animate-ping opacity-50" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+            </div>
+            <div className="text-left">
+              <span className="text-xs text-emerald-400 font-medium uppercase tracking-wide">
+                Server Running
+              </span>
+              <p className="text-sm font-semibold text-white leading-tight">
+                {runningServer.name}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 text-emerald-400 group-hover:text-emerald-300 text-sm font-medium transition-colors">
+            Manage
+            <ChevronRight size={15} />
+          </div>
+        </button>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -251,7 +313,7 @@ export default function Home() {
       ) : (
         <div className="grid grid-cols-2 gap-4">
           {displayedServers.map((server, i) => (
-            <ServerCard key={`server${i}${server.location}`} server={server} />
+            <ServerCard key={`server${i}${server.location}`} server={server} runningLocation={runningLocation} />
           ))}
         </div>
       )}
@@ -300,6 +362,14 @@ export default function Home() {
       >
         <ArrowUp size={20} />
       </button>
+
+      {showCreateServer && appData && (
+        <CreateServer
+          workingDir={appData.working_dir}
+          onClose={() => setShowCreateServer(false)}
+          onCreated={() => setShowCreateServer(false)}
+        />
+      )}
     </main>
   );
 }
