@@ -22,6 +22,7 @@ pub struct AppState {
     pub server_stdin: Mutex<Option<std::process::ChildStdin>>,
     pub server_running: Mutex<bool>,
     pub server_location: Mutex<Option<String>>,
+    pub server_pid: Mutex<Option<u32>>,
 }
 
 impl AppState {
@@ -31,6 +32,7 @@ impl AppState {
             server_stdin: Mutex::new(None),
             server_running: Mutex::new(false),
             server_location: Mutex::new(None),
+            server_pid: Mutex::new(None),
         }
     }
 }

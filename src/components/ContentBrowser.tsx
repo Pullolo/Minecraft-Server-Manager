@@ -1,11 +1,15 @@
 import {
   AlertTriangle,
+  ArrowLeft,
+  ArrowUp,
   Check,
   ChevronDown,
   Download,
+  ExternalLink,
   FileBox,
   Loader2,
   Package,
+  RefreshCw,
   Search,
   Trash2,
   X,
@@ -58,6 +62,23 @@ interface InstalledFile {
   name: string;
   size: number;
   path: string;
+}
+
+interface ContentMeta {
+  project_id: string;
+  version_id: string;
+  version_number: string;
+  name: string;
+}
+
+interface UpdateInfo {
+  filename: string;
+  project_id: string;
+  current_version_id: string;
+  current_version_number: string;
+  latest_version_id: string;
+  latest_version_number: string;
+  has_update: boolean;
 }
 
 // ─── Content config by engine ────────────────────────────────────────────────
@@ -127,40 +148,25 @@ async function modrinthSearch(
 ): Promise<ModrinthSearchResponse> {
   const allFacets = [...facets];
   if (gameVersion) allFacets.push([`versions:${gameVersion}`]);
-
-  const p = new URLSearchParams({
-    limit: String(PAGE),
-    offset: String(offset),
-    index,
-    facets: JSON.stringify(allFacets),
-  });
+  const p = new URLSearchParams({ limit: String(PAGE), offset: String(offset), index, facets: JSON.stringify(allFacets) });
   if (query.trim()) p.set("query", query.trim());
-
   const r = await fetch(`${MODRINTH}/search?${p}`, { headers: { "User-Agent": UA } });
   if (!r.ok) throw new Error(`Modrinth search returned ${r.status}`);
   return r.json();
 }
 
-async function fetchVersions(
-  projectId: string,
-  loader: string | null,
-  gameVersion: string | null,
-): Promise<ModrinthVersion[]> {
+async function fetchVersions(projectId: string, loader: string | null, gameVersion: string | null): Promise<ModrinthVersion[]> {
   const p = new URLSearchParams({ include_changelog: "false" });
   if (loader) p.set("loaders", JSON.stringify([loader]));
   if (gameVersion) p.set("game_versions", JSON.stringify([gameVersion]));
-
   const r = await fetch(`${MODRINTH}/project/${projectId}/version?${p}`, { headers: { "User-Agent": UA } });
   if (!r.ok) throw new Error(`Modrinth versions returned ${r.status}`);
   const versions: ModrinthVersion[] = await r.json();
-
-  // If no results for this specific game version, fall back to just loader
   if (versions.length === 0 && gameVersion && loader) {
     const p2 = new URLSearchParams({ include_changelog: "false", loaders: JSON.stringify([loader]) });
     const r2 = await fetch(`${MODRINTH}/project/${projectId}/version?${p2}`, { headers: { "User-Agent": UA } });
     if (r2.ok) return r2.json();
   }
-
   return versions;
 }
 
@@ -187,7 +193,6 @@ export default function ContentBrowser({
   const [searching, setSearching] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Per-project state
   const [dlState, setDlState] = useState<Record<string, DLState>>({});
   const [dlError, setDlError] = useState<Record<string, string>>({});
   const [openVersions, setOpenVersions] = useState<Record<string, ModrinthVersion[] | null>>({});
@@ -199,35 +204,69 @@ export default function ContentBrowser({
   const [installRevision, setInstallRevision] = useState(0);
   const [deletingPath, setDeletingPath] = useState<string | null>(null);
 
+  // Metadata + updates
+  const [metaMap, setMetaMap] = useState<Record<string, ContentMeta>>({});
+  const [updates, setUpdates] = useState<Record<string, UpdateInfo>>({});
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+
+  // Detail panel
+  const [detailFile, setDetailFile] = useState<InstalledFile | null>(null);
+
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // Escape to close
   useEffect(() => {
     const handler = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  // Focus search on open
   useEffect(() => { searchRef.current?.focus(); }, []);
+  useEffect(() => { setShowInstalled(false); setDetailFile(null); }, [activeIdx]);
 
-  // Reset installed view when tab changes
-  useEffect(() => { setShowInstalled(false); }, [activeIdx]);
-
-  // Fetch installed files whenever the installed view is open or content changes
+  // Fetch installed files + metadata when showing installed view
   useEffect(() => {
     if (!showInstalled) return;
     let cancelled = false;
     setLoadingInstalled(true);
-    invoke<InstalledFile[]>("list_installed_content", {
-      serverLocation: server.location,
-      subFolder: config.subFolder,
-    })
-      .then((files) => { if (!cancelled) setInstalledFiles(files); })
+
+    Promise.all([
+      invoke<InstalledFile[]>("list_installed_content", { serverLocation: server.location, subFolder: config.subFolder }),
+      invoke<Record<string, ContentMeta>>("get_content_metadata", { serverLocation: server.location, subFolder: config.subFolder }),
+    ])
+      .then(([files, meta]) => {
+        if (cancelled) return;
+        setInstalledFiles(files);
+        setMetaMap(meta);
+      })
       .catch(console.error)
       .finally(() => { if (!cancelled) setLoadingInstalled(false); });
+
     return () => { cancelled = true; };
   }, [showInstalled, config.subFolder, installRevision]);
+
+  // Check updates whenever metaMap changes and has entries
+  useEffect(() => {
+    if (!showInstalled || !config.loader || !mcVersion || Object.keys(metaMap).length === 0) return;
+    let cancelled = false;
+    setCheckingUpdates(true);
+
+    invoke<UpdateInfo[]>("check_content_updates", {
+      serverLocation: server.location,
+      subFolder: config.subFolder,
+      loader: config.loader,
+      gameVersion: mcVersion,
+    })
+      .then((list) => {
+        if (cancelled) return;
+        const map: Record<string, UpdateInfo> = {};
+        for (const u of list) map[u.filename] = u;
+        setUpdates(map);
+      })
+      .catch(console.error)
+      .finally(() => { if (!cancelled) setCheckingUpdates(false); });
+
+    return () => { cancelled = true; };
+  }, [metaMap, showInstalled]);
 
   // Debounce query
   useEffect(() => {
@@ -235,7 +274,7 @@ export default function ContentBrowser({
     return () => clearTimeout(t);
   }, [query]);
 
-  // Fetch whenever query, sort, or active tab changes
+  // Search
   useEffect(() => {
     let cancelled = false;
     setSearching(true);
@@ -277,7 +316,6 @@ export default function ContentBrowser({
       setOpenVersions((prev) => { const n = { ...prev }; delete n[hit.project_id]; return n; });
       return;
     }
-
     setOpenVersions((prev) => ({ ...prev, [hit.project_id]: null }));
     try {
       const versions = await fetchVersions(hit.project_id, config.loader, mcVersion);
@@ -301,6 +339,22 @@ export default function ContentBrowser({
         subFolder: config.subFolder,
         filename: file.filename,
       });
+
+      // Save metadata for update tracking
+      try {
+        await invoke("save_content_metadata", {
+          serverLocation: server.location,
+          subFolder: config.subFolder,
+          filename: file.filename,
+          projectId: hit.project_id,
+          versionId: version.id,
+          versionNumber: version.version_number,
+          name: hit.title,
+        });
+      } catch {
+        // non-fatal
+      }
+
       setDlState((p) => ({ ...p, [hit.project_id]: "done" }));
       setInstallRevision((v) => v + 1);
       setTimeout(() => setDlState((p) => { const n = { ...p }; delete n[hit.project_id]; return n; }), 3000);
@@ -319,6 +373,7 @@ export default function ContentBrowser({
     try {
       await invoke("delete_installed_file", { path });
       setInstallRevision((v) => v + 1);
+      if (detailFile?.path === path) setDetailFile(null);
     } catch (e) {
       console.error(e);
     } finally {
@@ -327,13 +382,12 @@ export default function ContentBrowser({
   }
 
   const hasMore = results.length < totalHits;
+  const updateCount = Object.values(updates).filter((u) => u.has_update).length;
 
   return (
     <div className="fixed inset-0 z-50 flex">
-      {/* Backdrop */}
       <div className="flex-1 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Panel */}
       <div className="w-[560px] flex flex-col bg-slate-900 border-l border-slate-700/50 h-full shadow-2xl">
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-slate-800 space-y-3">
@@ -341,19 +395,14 @@ export default function ContentBrowser({
             <div>
               <h2 className="text-base font-bold text-white">Add Content</h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                {server.name} · {server.engine}
-                {mcVersion ? ` ${mcVersion}` : ""} · via Modrinth
+                {server.name} · {server.engine}{mcVersion ? ` ${mcVersion}` : ""} · via Modrinth
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
-            >
+            <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all">
               <X size={17} />
             </button>
           </div>
 
-          {/* Tab switcher — only shown when there are multiple options */}
           {tabs.length > 1 && (
             <div className="flex gap-1 p-1 bg-slate-800/60 rounded-xl w-fit">
               {tabs.map((tab, i) => (
@@ -362,9 +411,7 @@ export default function ContentBrowser({
                   onClick={() => setActiveIdx(i)}
                   className={cn(
                     "px-4 py-1.5 rounded-lg text-sm font-medium transition-all",
-                    activeIdx === i
-                      ? "bg-slate-700 text-white shadow-sm"
-                      : "text-slate-400 hover:text-slate-200",
+                    activeIdx === i ? "bg-slate-700 text-white shadow-sm" : "text-slate-400 hover:text-slate-200",
                   )}
                 >
                   {tab.label}
@@ -378,15 +425,9 @@ export default function ContentBrowser({
         <div className="px-5 pt-4 pb-3 space-y-2.5 border-b border-slate-800/60">
           <div className="relative">
             {searching ? (
-              <Loader2
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 animate-spin pointer-events-none"
-              />
+              <Loader2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400 animate-spin pointer-events-none" />
             ) : (
-              <Search
-                size={14}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
-              />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
             )}
             <input
               ref={searchRef}
@@ -407,18 +448,16 @@ export default function ContentBrowser({
                   showInstalled ? "text-emerald-400" : "text-slate-500 hover:text-slate-300",
                 )}
               >
-                <div
-                  className={cn(
-                    "w-3.5 h-3.5 rounded border flex items-center justify-center transition-all",
-                    showInstalled
-                      ? "bg-emerald-500/20 border-emerald-500/50"
-                      : "border-slate-600 bg-slate-800/60",
-                  )}
-                >
+                <div className={cn("w-3.5 h-3.5 rounded border flex items-center justify-center transition-all", showInstalled ? "bg-emerald-500/20 border-emerald-500/50" : "border-slate-600 bg-slate-800/60")}>
                   {showInstalled && <Check size={9} className="text-emerald-400" />}
                 </div>
                 <FileBox size={12} />
                 Installed
+                {updateCount > 0 && (
+                  <span className="px-1.5 py-0.5 bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 rounded-full text-[10px] font-semibold">
+                    {updateCount} update{updateCount > 1 ? "s" : ""}
+                  </span>
+                )}
               </button>
               {!showInstalled && (
                 <span className="text-xs text-slate-500">
@@ -439,13 +478,33 @@ export default function ContentBrowser({
                 <option value="updated">Recently Updated</option>
               </select>
             )}
+            {showInstalled && config.loader && mcVersion && (
+              <button
+                onClick={() => setInstallRevision((v) => v + 1)}
+                disabled={checkingUpdates}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                title="Refresh and check for updates"
+              >
+                <RefreshCw size={11} className={cn(checkingUpdates && "animate-spin")} />
+                {checkingUpdates ? "Checking…" : "Check updates"}
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Results / Installed */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto console-scroll">
           {showInstalled ? (
-            loadingInstalled ? (
+            detailFile ? (
+              <DetailPanel
+                file={detailFile}
+                meta={metaMap[detailFile.name]}
+                update={updates[detailFile.name]}
+                deleting={deletingPath === detailFile.path}
+                onDelete={() => handleDeleteInstalled(detailFile.path)}
+                onBack={() => setDetailFile(null)}
+              />
+            ) : loadingInstalled ? (
               <div className="flex justify-center items-center h-48">
                 <Loader2 size={22} className="animate-spin text-emerald-400" />
               </div>
@@ -457,28 +516,41 @@ export default function ContentBrowser({
               </div>
             ) : (
               <div className="px-4 py-3 space-y-1.5">
-                {installedFiles.map((file) => (
-                  <div
-                    key={file.path}
-                    className="flex items-center gap-3 px-4 py-3 bg-slate-800/50 border border-slate-700/40 rounded-xl hover:border-slate-600/50 transition-all group"
-                  >
-                    <FileBox size={15} className="text-slate-500 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-200 truncate font-medium">{file.name}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{fmtBytes(file.size)}</p>
-                    </div>
+                {installedFiles.map((file) => {
+                  const upd = updates[file.name];
+                  return (
                     <button
-                      onClick={() => handleDeleteInstalled(file.path)}
-                      disabled={deletingPath === file.path}
-                      className="shrink-0 p-1.5 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
+                      key={file.path}
+                      onClick={() => setDetailFile(file)}
+                      className="w-full flex items-center gap-3 px-4 py-3 bg-slate-800/50 border border-slate-700/40 rounded-xl hover:border-slate-600/50 transition-all group text-left"
                     >
-                      {deletingPath === file.path
-                        ? <Loader2 size={14} className="animate-spin" />
-                        : <Trash2 size={14} />
-                      }
+                      <FileBox size={15} className="text-slate-500 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-slate-200 truncate font-medium">{file.name}</p>
+                          {upd?.has_update && (
+                            <span className="shrink-0 flex items-center gap-1 text-[10px] px-1.5 py-0.5 bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 rounded-full font-semibold">
+                              <ArrowUp size={9} />
+                              Update
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {metaMap[file.name]?.name ?? fmtBytes(file.size)}
+                          {metaMap[file.name] && ` · v${metaMap[file.name].version_number}`}
+                          {upd?.has_update && ` → v${upd.latest_version_number}`}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteInstalled(file.path); }}
+                        disabled={deletingPath === file.path}
+                        className="shrink-0 p-1.5 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all disabled:opacity-50"
+                      >
+                        {deletingPath === file.path ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                      </button>
                     </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           ) : searching ? (
@@ -489,9 +561,7 @@ export default function ContentBrowser({
             <div className="flex flex-col items-center justify-center h-48 text-center px-8">
               <Package size={32} className="text-slate-700 mb-3" />
               <p className="text-slate-400 text-sm">No {config.label.toLowerCase()} found</p>
-              {debouncedQuery && (
-                <p className="text-xs text-slate-600 mt-1">Try a different search term</p>
-              )}
+              {debouncedQuery && <p className="text-xs text-slate-600 mt-1">Try a different search term</p>}
             </div>
           ) : (
             <div className="px-4 py-3 space-y-2">
@@ -508,7 +578,6 @@ export default function ContentBrowser({
                   onDownload={(v) => handleDownload(hit, v)}
                 />
               ))}
-
               {hasMore && (
                 <button
                   onClick={loadMore}
@@ -527,17 +596,115 @@ export default function ContentBrowser({
   );
 }
 
+// ─── Detail Panel ─────────────────────────────────────────────────────────────
+
+function DetailPanel({
+  file,
+  meta,
+  update,
+  deleting,
+  onDelete,
+  onBack,
+}: {
+  file: InstalledFile;
+  meta?: ContentMeta;
+  update?: UpdateInfo;
+  deleting: boolean;
+  onDelete: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="px-5 py-4 space-y-4">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+      >
+        <ArrowLeft size={13} />
+        Back to installed
+      </button>
+
+      <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 space-y-3">
+        <div className="flex items-start gap-3">
+          <div className="w-12 h-12 rounded-xl bg-slate-700/50 flex items-center justify-center shrink-0">
+            <Package size={20} className="text-slate-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-bold text-white truncate">
+              {meta?.name ?? file.name}
+            </p>
+            <p className="text-xs text-slate-500 font-mono truncate mt-0.5">{file.name}</p>
+          </div>
+        </div>
+
+        {/* Version info */}
+        {meta && (
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <div className="bg-slate-900/60 rounded-lg p-3">
+              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide mb-1">Installed</p>
+              <p className="text-sm font-bold text-white">v{meta.version_number}</p>
+            </div>
+            <div className={cn("rounded-lg p-3", update?.has_update ? "bg-yellow-500/10 border border-yellow-500/20" : "bg-slate-900/60")}>
+              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide mb-1">Latest</p>
+              {update ? (
+                <p className={cn("text-sm font-bold", update.has_update ? "text-yellow-400" : "text-white")}>
+                  v{update.latest_version_number}
+                  {update.has_update && " ✦"}
+                </p>
+              ) : (
+                <p className="text-sm text-slate-500">—</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {update?.has_update && (
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+            <ArrowUp size={14} className="text-yellow-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-yellow-300">Update available</p>
+              <p className="text-[11px] text-yellow-400/70">
+                v{update.current_version_number} → v{update.latest_version_number}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Project link */}
+        {meta && (
+          <a
+            href={`https://modrinth.com/project/${meta.project_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs text-slate-400 hover:text-emerald-400 transition-colors"
+          >
+            <ExternalLink size={12} />
+            View on Modrinth
+          </a>
+        )}
+
+        {/* File info */}
+        <div className="text-[11px] text-slate-600 pt-1 border-t border-slate-700/40">
+          {(file.size / 1024 / 1024).toFixed(2)} MB · {file.path}
+        </div>
+      </div>
+
+      {/* Delete */}
+      <button
+        onClick={onDelete}
+        disabled={deleting}
+        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 text-red-400 hover:text-red-300 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+      >
+        {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+        {deleting ? "Deleting…" : "Delete File"}
+      </button>
+    </div>
+  );
+}
+
 // ─── ProjectCard ─────────────────────────────────────────────────────────────
 
 function ProjectCard({
-  hit,
-  config,
-  mcVersion,
-  dlState,
-  dlError,
-  versions,
-  onToggleVersions,
-  onDownload,
+  hit, config, mcVersion, dlState, dlError, versions, onToggleVersions, onDownload,
 }: {
   hit: ModrinthHit;
   config: ContentConfig;
@@ -563,23 +730,13 @@ function ProjectCard({
   return (
     <div className="bg-slate-800/50 border border-slate-700/40 rounded-xl p-4 hover:border-slate-600/50 transition-all">
       <div className="flex gap-3">
-        {/* Icon */}
         <div className="shrink-0 w-11 h-11 rounded-lg overflow-hidden bg-slate-700/50 flex items-center justify-center">
           {hit.icon_url ? (
-            <img
-              src={hit.icon_url}
-              alt={hit.title}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.currentTarget as HTMLImageElement).style.display = "none";
-              }}
-            />
+            <img src={hit.icon_url} alt={hit.title} className="w-full h-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           ) : (
             <Package size={18} className="text-slate-500" />
           )}
         </div>
-
-        {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-1">
             <div className="min-w-0">
@@ -591,26 +748,16 @@ function ProjectCard({
               <span>★ {fmt(hit.follows)}</span>
             </div>
           </div>
-
           <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">{hit.description}</p>
-
-          {/* Game version tags — show newest 4 */}
           <div className="flex flex-wrap gap-1 mt-2">
             {[...hit.versions].reverse().slice(0, 4).map((v) => (
-              <span key={v} className="text-[10px] px-1.5 py-0.5 bg-slate-700/60 text-slate-400 rounded font-mono">
-                {v}
-              </span>
+              <span key={v} className="text-[10px] px-1.5 py-0.5 bg-slate-700/60 text-slate-400 rounded font-mono">{v}</span>
             ))}
-            {hit.versions.length > 4 && (
-              <span className="text-[10px] px-1.5 py-0.5 text-slate-600 rounded">
-                +{hit.versions.length - 4} more
-              </span>
-            )}
+            {hit.versions.length > 4 && <span className="text-[10px] px-1.5 py-0.5 text-slate-600 rounded">+{hit.versions.length - 4} more</span>}
           </div>
         </div>
       </div>
 
-      {/* Footer row */}
       <div className="flex items-center justify-between mt-3">
         <div className="flex items-center gap-2">
           {clientOnly && (
@@ -620,42 +767,26 @@ function ProjectCard({
             </span>
           )}
         </div>
-
-        <button
-          onClick={dlState === "idle" ? onToggleVersions : undefined}
-          disabled={dlState !== "idle"}
-          className={btnClass}
-        >
+        <button onClick={dlState === "idle" ? onToggleVersions : undefined} disabled={dlState !== "idle"} className={btnClass}>
           {dlState === "downloading" && <><Loader2 size={11} className="animate-spin" /> Downloading…</>}
           {dlState === "done" && <><Check size={11} /> Downloaded</>}
           {dlState === "error" && <>✕ Failed</>}
           {dlState === "idle" && (
-            <>
-              <Download size={11} />
-              Download
-              <ChevronDown size={11} className={cn("transition-transform duration-150", versionPickerOpen && "rotate-180")} />
-            </>
+            <><Download size={11} /> Download <ChevronDown size={11} className={cn("transition-transform duration-150", versionPickerOpen && "rotate-180")} /></>
           )}
         </button>
       </div>
 
-      {/* Error tooltip */}
       {dlState === "error" && dlError && (
         <p className="text-[11px] text-red-400/80 mt-2 break-all">{dlError}</p>
       )}
 
-      {/* Version picker */}
       {versionPickerOpen && dlState === "idle" && (
         <div className="mt-3 pt-3 border-t border-slate-700/40">
           {versions === null ? (
-            <div className="flex justify-center py-3">
-              <Loader2 size={16} className="animate-spin text-slate-500" />
-            </div>
+            <div className="flex justify-center py-3"><Loader2 size={16} className="animate-spin text-slate-500" /></div>
           ) : versions.length === 0 ? (
-            <p className="text-xs text-slate-500 text-center py-3">
-              No compatible versions found
-              {mcVersion ? ` for ${config.loader ?? "this loader"} ${mcVersion}` : ""}
-            </p>
+            <p className="text-xs text-slate-500 text-center py-3">No compatible versions found{mcVersion ? ` for ${config.loader ?? "this loader"} ${mcVersion}` : ""}</p>
           ) : (
             <div className="space-y-1 max-h-52 overflow-y-auto console-scroll pr-1">
               {versions.map((v) => {
@@ -669,28 +800,12 @@ function ProjectCard({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs text-white font-medium">{v.version_number}</span>
-                        <span
-                          className={cn(
-                            "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                            v.version_type === "release" ? "bg-emerald-500/20 text-emerald-400" :
-                            v.version_type === "beta" ? "bg-yellow-500/20 text-yellow-400" :
-                            "bg-red-500/20 text-red-400",
-                          )}
-                        >
-                          {v.version_type}
-                        </span>
-                        <span className="text-[10px] text-slate-500 font-mono">
-                          {[...v.game_versions].reverse().slice(0, 3).join(" · ")}
-                        </span>
+                        <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium", v.version_type === "release" ? "bg-emerald-500/20 text-emerald-400" : v.version_type === "beta" ? "bg-yellow-500/20 text-yellow-400" : "bg-red-500/20 text-red-400")}>{v.version_type}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">{[...v.game_versions].reverse().slice(0, 3).join(" · ")}</span>
                       </div>
-                      {file && (
-                        <span className="text-[10px] text-slate-600">{fmtBytes(file.size)}</span>
-                      )}
+                      {file && <span className="text-[10px] text-slate-600">{fmtBytes(file.size)}</span>}
                     </div>
-                    <Download
-                      size={13}
-                      className="text-slate-600 group-hover:text-emerald-400 transition-colors shrink-0 ml-2"
-                    />
+                    <Download size={13} className="text-slate-600 group-hover:text-emerald-400 transition-colors shrink-0 ml-2" />
                   </button>
                 );
               })}

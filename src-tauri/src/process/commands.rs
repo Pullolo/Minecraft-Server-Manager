@@ -103,7 +103,24 @@ pub fn start_server(
         }
     }
 
-    let (program, args) = get_launch_command(Path::new(&location))?;
+    let (program, base_args) = get_launch_command(Path::new(&location))?;
+
+    // Inject JVM memory + extra flags when launching via java directly
+    let args: Vec<String> = if program == "java" {
+        let cfg = crate::server_config::read_config(&location);
+        let mem = cfg.memory_mb.unwrap_or(1024);
+        let mut java_args: Vec<String> = vec![
+            format!("-Xms{}M", mem / 2),
+            format!("-Xmx{}M", mem),
+        ];
+        if let Some(flags) = cfg.extra_jvm_flags.filter(|s| !s.trim().is_empty()) {
+            java_args.extend(flags.split_whitespace().map(|s| s.to_string()));
+        }
+        java_args.extend(base_args);
+        java_args
+    } else {
+        base_args
+    };
 
     let mut child = Command::new(&program)
         .args(&args)
@@ -124,6 +141,7 @@ pub fn start_server(
             }
         })?;
 
+    let pid = child.id();
     let stdin = child.stdin.take().ok_or("Failed to get stdin")?;
     let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
@@ -131,6 +149,7 @@ pub fn start_server(
     *state.server_stdin.lock().unwrap() = Some(stdin);
     *state.server_running.lock().unwrap() = true;
     *state.server_location.lock().unwrap() = Some(location.clone());
+    *state.server_pid.lock().unwrap() = Some(pid);
     let _ = app.emit("server-started", location.clone());
 
     // Stream stdout
@@ -158,6 +177,7 @@ pub fn start_server(
         *s.server_running.lock().unwrap() = false;
         *s.server_stdin.lock().unwrap() = None;
         *s.server_location.lock().unwrap() = None;
+        *s.server_pid.lock().unwrap() = None;
         let _ = app.emit("server-stopped", ());
     });
 
