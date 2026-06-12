@@ -105,16 +105,24 @@ pub fn start_server(
 
     let (program, base_args) = get_launch_command(Path::new(&location))?;
 
-    // Inject JVM memory + extra flags when launching via java directly
+    // Inject JVM memory + extra flags when launching via java directly.
+    // Per-server config overrides global defaults; global fills in any gaps.
     let args: Vec<String> = if program == "java" {
-        let cfg = crate::server_config::read_config(&location);
-        let mem = cfg.memory_mb.unwrap_or(1024);
+        let global = crate::server_config::read_global_config(&app);
+        let server = crate::server_config::read_config(&location);
+
+        let mem = server.memory_mb.or(global.memory_mb).unwrap_or(1024);
+        let flags = server
+            .extra_jvm_flags
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| global.extra_jvm_flags.filter(|s| !s.trim().is_empty()));
+
         let mut java_args: Vec<String> = vec![
             format!("-Xms{}M", mem / 2),
             format!("-Xmx{}M", mem),
         ];
-        if let Some(flags) = cfg.extra_jvm_flags.filter(|s| !s.trim().is_empty()) {
-            java_args.extend(flags.split_whitespace().map(|s| s.to_string()));
+        if let Some(f) = flags {
+            java_args.extend(f.split_whitespace().map(|s| s.to_string()));
         }
         java_args.extend(base_args);
         java_args

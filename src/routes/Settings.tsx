@@ -4,7 +4,10 @@ import {
   Check,
   ChevronLeft,
   FolderOpen,
+  Globe,
   HardDrive,
+  Loader2,
+  MemoryStick,
   RotateCcw,
   Save,
   Wifi,
@@ -14,6 +17,156 @@ import { useNavigate } from "react-router-dom";
 import { cn } from "../utils/utils";
 import { open } from "@tauri-apps/plugin-dialog";
 import Loader from "../components/Loader";
+import { invoke } from "@tauri-apps/api/core";
+
+interface ServerConfig {
+  memory_mb?: number | null;
+  extra_jvm_flags?: string | null;
+}
+
+const MEMORY_PRESETS = [512, 1024, 2048, 4096, 6144, 8192, 12288, 16384];
+
+function fmtMb(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(mb % 1024 === 0 ? 0 : 1)} GB` : `${mb} MB`;
+}
+
+function GlobalJvmCard() {
+  const [cfg, setCfg] = useState<ServerConfig>({ memory_mb: null, extra_jvm_flags: null });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    invoke<ServerConfig>("get_global_jvm_config")
+      .then((c) => setCfg(c))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const mem = cfg.memory_mb ?? 1024;
+  const flags = cfg.extra_jvm_flags ?? "";
+  const memIdx = MEMORY_PRESETS.indexOf(mem);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await invoke("save_global_jvm_config", { config: cfg });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-slate-800/90 backdrop-blur-xl border border-slate-700/50 rounded-2xl p-6 hover:border-slate-600/50 transition-all">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center">
+          <Globe size={24} className="text-violet-400" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-white">Default JVM Settings</h2>
+          <p className="text-slate-400 text-sm">
+            Applied to every server unless overridden per-server
+          </p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 size={24} className="animate-spin text-violet-400" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Memory */}
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <label className="flex items-center gap-2 text-sm font-semibold text-slate-200">
+                <MemoryStick size={14} className="text-slate-400" />
+                Default Max Memory (Xmx)
+              </label>
+              <span className="text-lg font-bold text-violet-400">{fmtMb(mem)}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 mb-2">
+              {MEMORY_PRESETS.map((mb) => (
+                <button
+                  key={mb}
+                  onClick={() => setCfg({ ...cfg, memory_mb: mb })}
+                  className={cn(
+                    "py-1.5 rounded-lg text-xs font-semibold border transition-all",
+                    mem === mb
+                      ? "bg-violet-500/20 border-violet-500/50 text-violet-300"
+                      : "bg-slate-900/50 border-slate-700/40 text-slate-400 hover:text-slate-200 hover:border-slate-600",
+                  )}
+                >
+                  {fmtMb(mb)}
+                </button>
+              ))}
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={MEMORY_PRESETS.length - 1}
+              value={memIdx === -1 ? 1 : memIdx}
+              onChange={(e) =>
+                setCfg({ ...cfg, memory_mb: MEMORY_PRESETS[Number(e.target.value)] })
+              }
+              className="w-full accent-violet-500"
+            />
+            <p className="text-xs text-slate-500 mt-2">
+              Xms (initial heap) is set to half of Xmx. Per-server settings override this.
+            </p>
+          </div>
+
+          {/* Extra flags */}
+          <div>
+            <label className="block text-sm font-semibold text-slate-200 mb-2">
+              Default Extra JVM Flags
+            </label>
+            <textarea
+              value={flags}
+              onChange={(e) => setCfg({ ...cfg, extra_jvm_flags: e.target.value || null })}
+              rows={3}
+              placeholder="-XX:+UseG1GC -XX:+ParallelRefProcEnabled ..."
+              className="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-200 font-mono placeholder:text-slate-600 focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/20 outline-none resize-none transition-all"
+            />
+            <p className="text-xs text-slate-500 mt-1">
+              Space-separated. Per-server flags override these entirely.
+            </p>
+          </div>
+
+          {/* Effective preview */}
+          <div className="bg-slate-950/60 border border-slate-700/30 rounded-xl p-4">
+            <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide mb-1">
+              Effective default launch flags
+            </p>
+            <code className="text-[11px] text-slate-400 font-mono break-all leading-relaxed">
+              java -Xms{Math.round(mem / 2)}M -Xmx{mem}M{flags ? ` ${flags}` : ""} -jar ...
+            </code>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-sm font-semibold transition-all disabled:opacity-50 shadow-lg shadow-violet-500/20"
+          >
+            {saving ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : saved ? (
+              "Saved ✓"
+            ) : (
+              <>
+                <Save size={14} />
+                Save Global Defaults
+              </>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -245,6 +398,8 @@ export default function Settings() {
               </div>
             </div>
           </div>
+
+          <GlobalJvmCard />
         </div>
 
         {/* Action buttons */}

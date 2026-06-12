@@ -21,7 +21,7 @@ use create::{
     fetch_fabric_game_versions, fetch_forge_mc_versions, fetch_forge_versions,
     create_server,
 };
-use server_config::{get_server_config, save_server_config, delete_server, rename_server, read_server_log};
+use server_config::{get_server_config, save_server_config, delete_server, rename_server, read_server_log, get_global_jvm_config, save_global_jvm_config};
 use stats::get_server_resource_usage;
 use backup::{backup_world, list_backups, delete_backup};
 use players::{get_whitelist, set_whitelist, get_ops, set_ops, get_banned_players, unban_player, lookup_player};
@@ -75,6 +75,8 @@ pub fn run() {
             delete_server,
             rename_server,
             read_server_log,
+            get_global_jvm_config,
+            save_global_jvm_config,
             get_server_resource_usage,
             backup_world,
             list_backups,

@@ -361,10 +361,24 @@ export default function ManageServer() {
                       {server.engine}
                     </span>
                   </div>
+
+                  {/* Toolbar — lives under the badges */}
+                  <div className="flex items-center gap-1.5 flex-wrap mt-3">
+                    {toolbarBtns.map((btn) => (
+                      <button
+                        key={btn.label}
+                        onClick={btn.action}
+                        title={btn.label}
+                        className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600/40 hover:border-slate-500 text-slate-400 hover:text-white transition-all"
+                      >
+                        {btn.icon}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Right: status + controls */}
+              {/* Right: status + start/stop only */}
               <div className="shrink-0 flex flex-col items-end gap-3">
                 {isRunning ? (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
@@ -378,21 +392,6 @@ export default function ManageServer() {
                   </div>
                 )}
 
-                {/* Toolbar icons */}
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                  {toolbarBtns.map((btn) => (
-                    <button
-                      key={btn.label}
-                      onClick={btn.action}
-                      title={btn.label}
-                      className="p-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 border border-slate-600/40 hover:border-slate-500 text-slate-400 hover:text-white transition-all"
-                    >
-                      {btn.icon}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Start / Stop */}
                 {isRunning ? (
                   <button
                     onClick={handleStop}
